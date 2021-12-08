@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement; // biblioteca do gerenciador de cenas da Unit
 using UnityEngine.UI; // biblioteca da Interface de Usuario da Unity
 
 // Outras Bibliotecas
+using System;
 using System.IO; // biblioteca ultilizada para alterar arquivos
 using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivos XML
 
@@ -16,41 +17,51 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
     public float startspeed, speedMax, jumpForce, dashForce; // movimentação, pulo e dash
 
     // variaveis quanticas (sempre estarão em constante alteração)
-    private float speed, timerDash /* tempo no dash */ , coyoteTimer, directX /* direção X do dash */, directY/* direção Y do dash */;
+    private float speed, timerDash /* tempo no dash */ , coyoteTimer, directX /* direção X do dash */, directY/* direção Y do dash */, life, maxLife;
     private bool inL, inR, inDash, canMakeDash; //inL e inR verifica se o jogador olha para a direita ou esquerda
-    private int jumps; // quantidades de pulos dados
-    private string file, thatScene;
+    private int jumps, thatScene; // quantidades de pulos dados
+    private string file;
     // -=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-
 
     // Acontece antes da fase inicias 
     private void Awake() 
     {
+        // define onde será salvo o arquivo do game, sendo "Application.persistentDataPath" definido automaticamente pela Unity
+        // A Application.persistentDataPath fica em AppData/ nome do game /arquivo dat
         file = Application.persistentDataPath + "/saveData1.dat";
 
         // o objeto não sera distruido, e passara de uma cena para outra
-        DontDestroyOnLoad(this.gameObject); 
+        DontDestroyOnLoad(this.gameObject);
+
     }
 
     // Acontece quando a fase inicia
     private void Start()
     {
-        if (thatScene == null)
-            thatScene = "NUM1";
-
         this.transform.position = new Vector3(0, 0, 0); // Coloca o objeto no cntro do mapa
 
-        if(GameObject.Find("lifeBar").GetComponent<Slider>().value == 0) // se a vida não foi definida, logo é a primeira fase, portanto será dado os valores iniciais do game
+        if(life == 0)
         {
-            GameObject.Find("lifeBar").GetComponent<Slider>().value = 50;
-            GameObject.Find("lifeBar").GetComponent<Slider>().maxValue = 100;
+            life = 50;
+            maxLife = 100;
+        }
+
+        if(GameObject.Find("lifeBar") != null && GameObject.Find("lifeBar").GetComponent<Slider>().value == 0) // se a vida não foi definida, logo é a primeira fase, portanto será dado os valores iniciais do game
+        {
+            GameObject.Find("lifeBar").GetComponent<Slider>().value = life;
+            GameObject.Find("lifeBar").GetComponent<Slider>().maxValue = maxLife;
         }
 
         player = GameObject.Find("player"); // procura o player
+
     }
 
     // Atualiza constantemente, independentemente do FPS
     private void FixedUpdate()
     {
+        for (int i = 0; i < 10; i++)
+            Start();
+
         // Se o jogador for == null, logo o usuario esta em uma cena sem jogador (como o menu do game), por isso atribuise o "if (player != null)", para que não
         // der nenhum erro. isso é nescessario Tambem por que objeto carrega variaveis do Load.
         if (player != null)
@@ -86,35 +97,36 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
                 }
             }
 
+            // Coyote time, quando o jogador sai da plataforma. ele terá uma "segunda chance" para pular
+            if (InGround() != true) coyoteTimer += Time.deltaTime;
+            else coyoteTimer = 0;
+
             // -=-=-=-=-=-=-=- DASH -=-=-=-=-=-=-=-
-            if (Input.GetButton("Fire1") && inDash == false && canMakeDash == true)
+            if (Input.GetButton("Fire1") && inDash == false && canMakeDash == true) // botão de dash
             {
-                if (Input.GetAxisRaw("Horizontal") > 0)
-                    directX = 1;
-                else if (Input.GetAxisRaw("Horizontal") < 0)
-                    directX = -1;
-                else
-                    directX = 0;
+                // define a direção do Dash em X
+                if (Input.GetAxisRaw("Horizontal") > 0) directX = 1;
+                else if (Input.GetAxisRaw("Horizontal") < 0) directX = -1;
+                else directX = 0;
 
-                if (Input.GetAxisRaw("Vertical") > 0)
-                    directY = 1;
-                else if (Input.GetAxisRaw("Vertical") < 0)
-                    directY = -1;
-                else
-                    directY = 0;
+                // define a direção do Dash em Y
+                if (Input.GetAxisRaw("Vertical") > 0) directY = 1;
+                else if (Input.GetAxisRaw("Vertical") < 0) directY = -1;
+                else directY = 0;
 
-                if (directY != 0 || directX != 0)
-                    inDash = true;
+                // Inicia o Dash
+                if (directY != 0 || directX != 0) inDash = true;
             }
 
-            if (inDash == true)
+            if (inDash == true) // Quando está no dash
             {
-                player.GetComponent<Animator>().Play("dash");
-                player.GetComponent<Rigidbody2D>().gravityScale = 0;
-                player.GetComponent<Rigidbody2D>().velocity = new Vector2(dashForce * directX, dashForce * directY);
-                timerDash += Time.deltaTime;
+                player.GetComponent<Animator>().Play("dash"); // Animação de dash
+                player.GetComponent<Rigidbody2D>().gravityScale = 0; // muda a gravidade para 0
+                player.GetComponent<Rigidbody2D>().velocity = new Vector2(dashForce * directX, dashForce * directY); // O dash
                 speed = 0;
 
+                // timer para acabar o dash
+                timerDash += Time.deltaTime;
                 if (timerDash >= 0.4f)
                 {
                     timerDash = 0;
@@ -122,61 +134,67 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
                     canMakeDash = false;
                 }
             }
-            else
+            else // Acabou o dash
             {
-                player.GetComponent<Rigidbody2D>().gravityScale = 10;
+                player.GetComponent<Rigidbody2D>().gravityScale = 10; // volta a gravidade pro normal
 
+                // zerar posições do dash
                 directX = 0;
                 directY = 0;
             }
 
             // -=-=-=-=-=-=-=- PULAR -=-=-=-=-=-=-=-
-            if (InGround() != true)
-                coyoteTimer += Time.deltaTime;
-            else
-                coyoteTimer = 0;
-
-            if (Input.GetButton("Fire3") && (InGround() == true || coyoteTimer <= 0.2f && jumps == 0)) // Pular
+            if (Input.GetButton("Fire3") && (InGround() == true || coyoteTimer <= 0.2f && jumps == 0)) // botão pular
             {
-                player.GetComponent<Rigidbody2D>().AddForce(new Vector2(0, jumpForce), ForceMode2D.Impulse);
-                jumps++;
+                player.GetComponent<Rigidbody2D>().AddForce(new Vector2(0, jumpForce), ForceMode2D.Impulse); // pula
+                jumps++; // Aumenta a quantidade de pulos
             }
+
             // -=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-
         }
+
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            Save();
+        }
+
+        Debug.Log(thatScene);
     }
 
     private bool InGround() // verifica se o player esta tocando no chão
     {
+        // o RayCast sera lançado na posição do player para baixo, e ira ignorar todas as layers menos a 8, que é layer de plataforma
         RaycastHit2D hit = Physics2D.Raycast(new Vector3(player.transform.position.x, player.transform.position.y - 1.5f, player.transform.position.z), Vector3.down, 0.2f, 1 << 8);
-        if (hit.collider != null)
+        
+        if (hit.collider != null) // se colidiu na plataforma 
         {
-            jumps = 0;
-            canMakeDash = true;
+            jumps = 0; // zera a quantidade de pulos dados
+            canMakeDash = true; // só pode dá dash denovo se tocar no chão
             return true;
         }
-
         return false;
     }
 
     private void Flip() // gira o Player
     {
-        if ((inL && !inR) || (!inL && inR))
+        if ((inL && !inR) || (!inL && inR)) // se ele trocou a direção
         {
-            inR = !inR;
-            player.transform.localScale = new Vector2(player.transform.localScale.x * -1, transform.localScale.y);
+            inR = !inR; // faz com que não gire infinitamente
+            player.transform.localScale = new Vector2(player.transform.localScale.x * -1, transform.localScale.y); // troca direção
         }
     }
 
     public void ChangeLife(float newLife, float newMax) // mudar barra de vida
     {
-        GameObject.Find("lifeBar").GetComponent<Slider>().value += newLife;
-        GameObject.Find("lifeBar").GetComponent<Slider>().maxValue += newMax;
+        GameObject.Find("lifeBar").GetComponent<Slider>().value += newLife; // vida atual
+        GameObject.Find("lifeBar").GetComponent<Slider>().maxValue += newMax; // vida maxima
     }
 
-    public void ChangeScene(string newScene) // muda cena atual
+    public void ChangeScene(int newScene) // muda cena atual
     {
-        SceneManager.LoadScene(newScene);
         thatScene = newScene;
+        SceneManager.LoadSceneAsync(newScene);
+        Start();
     }
 
     // =-=-=-=-=-=-=-=-= Apartir daqui o script não é só de mecanica basica, e passa a lidar com sistemas de salvamento, Serialização, entre outros recursos. =-=-=-=-=-=-=-=-=
@@ -185,55 +203,74 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
 
     public void Save()
     {
-        if (File.Exists(file))
-            File.Delete(file);
-        else
-            File.Create(file);
+        // verifica se o arquivo de Save já existe
+        if (File.Exists(file)) File.Delete(file); // o arquivo sera apagado para da lugar ao "novo", na visao do usuario ele foi apenas reescrito
+        else File.Create(file); // criar novo arquivo de save
 
-        XmlSerializer x = new XmlSerializer(typeof(SaveData));
-        StreamWriter writer = new StreamWriter(file, true);
+        XmlSerializer x = new XmlSerializer(typeof(SaveData)); // define qual classe tera suas variaveis serializada
+        StreamWriter writer = new StreamWriter(file, true); // escritor de arquivo
 
-        SaveData sd = new SaveData();
-        sd.posx = player.transform.position.x;
-        sd.posy = player.transform.position.y;
+        SaveData sd = new SaveData(); // tras as variaveis
+        if(GameObject.Find("player") != null)
+        {
+            // posição do player
+            sd.posx = player.transform.position.x;
+            sd.posy = player.transform.position.y;
+        }
 
-        sd.atuallife = GameObject.Find("lifeBar").GetComponent<Slider>().value;
-        sd.MaxLife = GameObject.Find("lifeBar").GetComponent<Slider>().maxValue;
-
+        if(GameObject.Find("lifeBar").GetComponent<Slider>() != null)
+        {
+            // life
+            sd.atuallife = GameObject.Find("lifeBar").GetComponent<Slider>().value;
+            sd.MaxLife = GameObject.Find("lifeBar").GetComponent<Slider>().maxValue;
+        }
+        
+        // cena
         sd.cena = thatScene;
 
-        x.Serialize(writer, sd);
-        writer.Close();
+        x.Serialize(writer, sd); // escreve o arquivo 
+        writer.Close(); // fecha o arquivo
     }
 
-    private void Load()
+    public void Load()
     {
-        XmlSerializer x = new XmlSerializer(typeof(SaveData));
-        StreamReader reader = new StreamReader(file);
+        XmlSerializer x = new XmlSerializer(typeof(SaveData)); // define qual classe tera suas variaveis serializada
+        StreamReader reader = new StreamReader(file); // lê o arquivo
 
-        SaveData sd = (SaveData)x.Deserialize(reader);
-        player.transform.position = new Vector2(sd.PosX, sd.PosY);
+        SaveData sd = (SaveData)x.Deserialize(reader); // Deserialisa o arquivo de save na classe de dados
 
-        GameObject.Find("lifeBar").GetComponent<Slider>().value = sd.Atuallife;
-        GameObject.Find("lifeBar").GetComponent<Slider>().maxValue = sd.MaxLife;
+        // muda a cena se estiver numa diferente
 
-        if (thatScene != sd.cena)
-            ChangeScene(sd.cena);
-        else
-            thatScene = sd.Cena;
+        // posição do player
 
-        reader.Close();
+        if (thatScene != sd.cena) ChangeScene(sd.cena);
+        else thatScene = sd.Cena;
+
+        if (GameObject.Find("player") != null)
+        {
+            player.transform.position = new Vector2(sd.PosX, sd.PosY);
+        }
+
+        if (GameObject.Find("lifeBar").GetComponent<Slider>() != null)
+        {
+            //vida
+            life = sd.Atuallife;
+            maxLife = sd.MaxLife;
+        }
+        reader.Close(); // fecha o arquivo
+
+        Start();
     }
 }
-[XmlRoot("gameData")]
 
-public class SaveData : Player_script 
+// Classe de dados a serem serializadas, na qual herdara do Player_Script
+// o xmlRoot determina qual será o arquivo raiz do xml
+[XmlRoot("gameData")] public class SaveData 
 {
     // Possição
     public float posx;
     public float posy;
-
-    [XmlElement("PosX",typeof(float))]
+    [XmlElement("PosX", typeof(float))]
     public float PosX
     {
         get { return this.posx; }
@@ -266,15 +303,14 @@ public class SaveData : Player_script
     }
 
     // Cena
-    public string cena;
+    public int cena;
 
-    [XmlElement("Cena",typeof(string))]
-    public string Cena 
+    [XmlElement("Cena", typeof(int))]
+    public int Cena 
     {
         get { return this.cena; }
         set { this.cena = value; }
     }
-
 }
 
 // Made By: Auslan Vieira Fontes

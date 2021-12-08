@@ -5,6 +5,7 @@ TagManager:
   serializedVersion: 2
   tags:
   - Plataforma
+  - cora
   layers:
   - Default
   - TransparentFX
