@@ -1,28 +1,32 @@
 // Bibliotecas da Unity
 using UnityEngine; // biblioteca da unity usado para acessar os componentes principais, como gameobjects e seus respectivos componentes
 using UnityEngine.SceneManagement; // biblioteca do gerenciador de cenas da Unity
-using UnityEngine.UI; // biblioteca a Interface de Usuario da Unity
+using UnityEngine.UI; // biblioteca da Interface de Usuario da Unity
 
 // Outras Bibliotecas
-using System.Collections;
-using System.Collections.Generic;
+using System.IO; // biblioteca ultilizada para alterar arquivos
+using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivos XML
 
 // Classe, na qual ira herdar a classe MonoBehaviour(só deus sabe onde se encontra), que atribui os comandos da Unity, como transforms, vetores, e etc
-public class Player_script : MonoBehaviour
+// [SerializeField] torna a classe Serizalizavel
+[SerializeField] public class Player_script : MonoBehaviour
 {
     // -=-=-=-=-=-=-=--=-=-=-=-=-=-=- variaveis gerais -=-=-=-=-=-=-=--=-=-=-=-=-=-=-
     private GameObject player; // o jogador
     public float startspeed, speedMax, jumpForce, dashForce; // movimentação, pulo e dash
 
     // variaveis quanticas (sempre estarão em constante alteração)
-    private float speed, timerDash /* tempo no dash */ , coyoteTimer, directX /* direção X do dash */, directY/* direção Y do dash */, life, maxLife;
+    private float speed, timerDash /* tempo no dash */ , coyoteTimer, directX /* direção X do dash */, directY/* direção Y do dash */;
     private bool inL, inR, inDash, canMakeDash; //inL e inR verifica se o jogador olha para a direita ou esquerda
     private int jumps; // quantidades de pulos dados
+    private string file, thatScene;
     // -=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-
 
     // Acontece antes da fase inicias 
     private void Awake() 
     {
+        file = Application.persistentDataPath + "/saveData1.dat";
+
         // o objeto não sera distruido, e passara de uma cena para outra
         DontDestroyOnLoad(this.gameObject); 
     }
@@ -30,17 +34,16 @@ public class Player_script : MonoBehaviour
     // Acontece quando a fase inicia
     private void Start()
     {
+        if (thatScene == null)
+            thatScene = "NUM1";
+
         this.transform.position = new Vector3(0, 0, 0); // Coloca o objeto no cntro do mapa
 
-        if(life == 0) // se a vida não foi definida, logo é a primeira fase, portanto será dado os valores iniciais do game
+        if(GameObject.Find("lifeBar").GetComponent<Slider>().value == 0) // se a vida não foi definida, logo é a primeira fase, portanto será dado os valores iniciais do game
         {
-            life = 50;
-            maxLife = 100;
+            GameObject.Find("lifeBar").GetComponent<Slider>().value = 50;
+            GameObject.Find("lifeBar").GetComponent<Slider>().maxValue = 100;
         }
-
-        // Atribui os status de vida
-        GameObject.Find("lifeBar").GetComponent<Slider>().value = life;
-        GameObject.Find("lifeBar").GetComponent<Slider>().maxValue = maxLife;
 
         player = GameObject.Find("player"); // procura o player
     }
@@ -173,26 +176,105 @@ public class Player_script : MonoBehaviour
     public void ChangeScene(string newScene) // muda cena atual
     {
         SceneManager.LoadScene(newScene);
+        thatScene = newScene;
     }
 
-    // =-=-=-=-=-=-=-=-=-= Apartir daqui o script não é mecanica basica, e passa a lidar com sistemas de salvamento, Serialização, entre outros recursos. =-=-=-=-=-=-=-=-=-=
+    // =-=-=-=-=-=-=-=-= Apartir daqui o script não é só de mecanica basica, e passa a lidar com sistemas de salvamento, Serialização, entre outros recursos. =-=-=-=-=-=-=-=-=
 
     // ====================== save and Load System ======================
 
     public void Save()
     {
+        if (File.Exists(file))
+            File.Delete(file);
+        else
+            File.Create(file);
 
+        XmlSerializer x = new XmlSerializer(typeof(SaveData));
+        StreamWriter writer = new StreamWriter(file, true);
+
+        SaveData sd = new SaveData();
+        sd.posx = player.transform.position.x;
+        sd.posy = player.transform.position.y;
+
+        sd.atuallife = GameObject.Find("lifeBar").GetComponent<Slider>().value;
+        sd.MaxLife = GameObject.Find("lifeBar").GetComponent<Slider>().maxValue;
+
+        sd.cena = thatScene;
+
+        x.Serialize(writer, sd);
+        writer.Close();
     }
 
     private void Load()
     {
+        XmlSerializer x = new XmlSerializer(typeof(SaveData));
+        StreamReader reader = new StreamReader(file);
 
+        SaveData sd = (SaveData)x.Deserialize(reader);
+        player.transform.position = new Vector2(sd.PosX, sd.PosY);
+
+        GameObject.Find("lifeBar").GetComponent<Slider>().value = sd.Atuallife;
+        GameObject.Find("lifeBar").GetComponent<Slider>().maxValue = sd.MaxLife;
+
+        if (thatScene != sd.cena)
+            ChangeScene(sd.cena);
+        else
+            thatScene = sd.Cena;
+
+        reader.Close();
     }
 }
+[XmlRoot("gameData")]
 
 public class SaveData : Player_script 
 {
-    public float posx, posy;
+    // Possição
+    public float posx;
+    public float posy;
+
+    [XmlElement("PosX",typeof(float))]
+    public float PosX
+    {
+        get { return this.posx; }
+        set { this.posx = value; }
+    }
+
+    [XmlElement("PosY", typeof(float))]
+    public float PosY
+    {
+        get { return this.posy; }
+        set { this.posy = value; }
+    }
+
+    // Vida
+    public float atuallife;
+    public float maxLife;
+
+    [XmlElement("Atuallife", typeof(float))]
+    public float Atuallife
+    {
+        get { return this.atuallife; }
+        set { this.atuallife = value; }
+    }
+
+    [XmlElement("MaxLife", typeof(float))]
+    public float MaxLife
+    {
+        get { return this.maxLife; }
+        set { this.maxLife = value; }
+    }
+
+    // Cena
+    public string cena;
+
+    [XmlElement("Cena",typeof(string))]
+    public string Cena 
+    {
+        get { return this.cena; }
+        set { this.cena = value; }
+    }
+
 }
 
 // Made By: Auslan Vieira Fontes
