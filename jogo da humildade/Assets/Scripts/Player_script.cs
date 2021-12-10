@@ -4,7 +4,6 @@ using UnityEngine.SceneManagement; // biblioteca do gerenciador de cenas da Unit
 using UnityEngine.UI; // biblioteca da Interface de Usuario da Unity
 
 // Outras Bibliotecas
-using System;
 using System.IO; // biblioteca ultilizada para alterar arquivos
 using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivos XML
 
@@ -14,13 +13,17 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
 {
     // -=-=-=-=-=-=-=--=-=-=-=-=-=-=- variaveis gerais -=-=-=-=-=-=-=--=-=-=-=-=-=-=-
     private GameObject player; // o jogador
+
     public float startspeed, speedMax, jumpForce, dashForce; // movimentação, pulo e dash
+    public string[] file = new string[3]; // arquivo de save
 
     // variaveis quanticas (sempre estarão em constante alteração)
     private float speed, timerDash /* tempo no dash */ , coyoteTimer, directX /* direção X do dash */, directY/* direção Y do dash */, life, maxLife;
-    private bool inL, inR, inDash, canMakeDash; //inL e inR verifica se o jogador olha para a direita ou esquerda
+    private bool inL, inR, inDash, canMakeDash, loaded; //inL e inR verifica se o jogador olha para a direita ou esquerda
+    public Vector2 posLoaded; // posição do jogador que foi serealizada
     private int jumps, thatScene; // quantidades de pulos dados
-    private string file;
+
+    public int theSave;
     // -=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-
 
     // Acontece antes da fase inicias 
@@ -28,11 +31,12 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
     {
         // define onde será salvo o arquivo do game, sendo "Application.persistentDataPath" definido automaticamente pela Unity
         // A Application.persistentDataPath fica em AppData/ nome do game /arquivo dat
-        file = Application.persistentDataPath + "/saveData1.dat";
+        file[0] = Application.persistentDataPath + "/saveData1.dat";
+        file[1] = Application.persistentDataPath + "/saveData2.dat";
+        file[2] = Application.persistentDataPath + "/saveData3.dat";
 
         // o objeto não sera distruido, e passara de uma cena para outra
         DontDestroyOnLoad(this.gameObject);
-
     }
 
     // Acontece quando a fase inicia
@@ -45,22 +49,41 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
             life = 50;
             maxLife = 100;
         }
-
-        if(GameObject.Find("lifeBar") != null && GameObject.Find("lifeBar").GetComponent<Slider>().value == 0) // se a vida não foi definida, logo é a primeira fase, portanto será dado os valores iniciais do game
-        {
-            GameObject.Find("lifeBar").GetComponent<Slider>().value = life;
-            GameObject.Find("lifeBar").GetComponent<Slider>().maxValue = maxLife;
-        }
-
-        player = GameObject.Find("player"); // procura o player
-
     }
 
     // Atualiza constantemente, independentemente do FPS
     private void FixedUpdate()
     {
-        for (int i = 0; i < 10; i++)
-            Start();
+        if(player == null)
+            player = GameObject.Find("player"); // procura o player
+
+        if(loaded == true && player != null) // carrega dados ao trocar de cena
+        {
+            XmlSerializer x = new XmlSerializer(typeof(SaveData)); // define qual classe tera suas variaveis serializada
+            StreamReader reader = new StreamReader(file[theSave]); // lê o arquivo
+
+            SaveData sd = (SaveData)x.Deserialize(reader); // Deserialisa o arquivo de save na classe de dados
+
+            // posição do player
+            posLoaded = new Vector2(sd.PosX, sd.PosY);
+            player.transform.position = posLoaded;
+
+            if (GameObject.Find("lifeBar").GetComponent<Slider>() != null)
+            {
+                //vida
+                life = sd.Atuallife;
+                maxLife = sd.MaxLife;
+            }
+
+            reader.Close(); // fecha o arquivo
+            loaded = false;
+        }
+
+        if (GameObject.Find("lifeBar") != null) // carrega a barra de vida
+        {
+            GameObject.Find("lifeBar").GetComponent<Slider>().value = life;
+            GameObject.Find("lifeBar").GetComponent<Slider>().maxValue = maxLife;
+        }
 
         // Se o jogador for == null, logo o usuario esta em uma cena sem jogador (como o menu do game), por isso atribuise o "if (player != null)", para que não
         // der nenhum erro. isso é nescessario Tambem por que objeto carrega variaveis do Load.
@@ -155,7 +178,9 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
 
         if (Input.GetKeyDown(KeyCode.S))
         {
-            Save();
+            Save(theSave);
+            Save(theSave);
+            Save(theSave);
         }
 
         Debug.Log(thatScene);
@@ -180,7 +205,7 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
         if ((inL && !inR) || (!inL && inR)) // se ele trocou a direção
         {
             inR = !inR; // faz com que não gire infinitamente
-            player.transform.localScale = new Vector2(player.transform.localScale.x * -1, transform.localScale.y); // troca direção
+            player.transform.localScale = new Vector2(player.transform.localScale.x * -1, player.transform.localScale.y); // troca direção
         }
     }
 
@@ -190,25 +215,26 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
         GameObject.Find("lifeBar").GetComponent<Slider>().maxValue += newMax; // vida maxima
     }
 
-    public void ChangeScene(int newScene) // muda cena atual
+    public void ChangeScene(int newScene, int save) // muda cena atual
     {
+        theSave = save;
         thatScene = newScene;
         SceneManager.LoadSceneAsync(newScene);
         Start();
     }
 
-    // =-=-=-=-=-=-=-=-= Apartir daqui o script não é só de mecanica basica, e passa a lidar com sistemas de salvamento, Serialização, entre outros recursos. =-=-=-=-=-=-=-=-=
-
     // ====================== save and Load System ======================
 
-    public void Save()
+    public void Save(int save)
     {
+        theSave = save; // define qual save
+
         // verifica se o arquivo de Save já existe
-        if (File.Exists(file)) File.Delete(file); // o arquivo sera apagado para da lugar ao "novo", na visao do usuario ele foi apenas reescrito
-        else File.Create(file); // criar novo arquivo de save
+        if (File.Exists(file[theSave])) File.Delete(file[theSave]); // o arquivo sera apagado para da lugar ao "novo", na visao do usuario ele foi apenas reescrito
+        else File.Create(file[theSave]); // criar novo arquivo de save
 
         XmlSerializer x = new XmlSerializer(typeof(SaveData)); // define qual classe tera suas variaveis serializada
-        StreamWriter writer = new StreamWriter(file, true); // escritor de arquivo
+        StreamWriter writer = new StreamWriter(file[theSave], true); // escritor de arquivo
 
         SaveData sd = new SaveData(); // tras as variaveis
         if(GameObject.Find("player") != null)
@@ -232,33 +258,22 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
         writer.Close(); // fecha o arquivo
     }
 
-    public void Load()
+    public void Load(int save)
     {
+        theSave = save; // define qual save
+
         XmlSerializer x = new XmlSerializer(typeof(SaveData)); // define qual classe tera suas variaveis serializada
-        StreamReader reader = new StreamReader(file); // lê o arquivo
+        StreamReader reader = new StreamReader(file[theSave]); // lê o arquivo
 
         SaveData sd = (SaveData)x.Deserialize(reader); // Deserialisa o arquivo de save na classe de dados
 
         // muda a cena se estiver numa diferente
-
-        // posição do player
-
-        if (thatScene != sd.cena) ChangeScene(sd.cena);
+        if (thatScene != sd.cena) ChangeScene(sd.cena, theSave);
         else thatScene = sd.Cena;
 
-        if (GameObject.Find("player") != null)
-        {
-            player.transform.position = new Vector2(sd.PosX, sd.PosY);
-        }
-
-        if (GameObject.Find("lifeBar").GetComponent<Slider>() != null)
-        {
-            //vida
-            life = sd.Atuallife;
-            maxLife = sd.MaxLife;
-        }
         reader.Close(); // fecha o arquivo
 
+        loaded = true;
         Start();
     }
 }
