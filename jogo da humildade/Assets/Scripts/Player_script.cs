@@ -22,7 +22,7 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
     private bool inL, inR, inDash, canMakeDash, loaded; //inL e inR verifica se o jogador olha para a direita ou esquerda
     public Vector2 posLoaded; // posição do jogador que foi serealizada
     private int jumps, thatScene; // quantidades de pulos dados
-
+    public Vector2 theLastPosition;
     public int theSave;
     // -=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-
 
@@ -30,7 +30,6 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
     private void Awake() 
     {
         // define onde será salvo o arquivo do game, sendo "Application.persistentDataPath" definido automaticamente pela Unity
-        // A Application.persistentDataPath fica em AppData/ nome do game /arquivo dat
         file[0] = Application.persistentDataPath + "/saveData1.dat";
         file[1] = Application.persistentDataPath + "/saveData2.dat";
         file[2] = Application.persistentDataPath + "/saveData3.dat";
@@ -42,7 +41,7 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
     // Acontece quando a fase inicia
     private void Start()
     {
-        this.transform.position = new Vector3(0, 0, 0); // Coloca o objeto no cntro do mapa
+        this.transform.position = new Vector3(0, 0, 0); // Coloca o objeto no centro do mapa
 
         if(life == 0)
         {
@@ -68,9 +67,13 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
             posLoaded = new Vector2(sd.PosX, sd.PosY);
             player.transform.position = posLoaded;
 
+            // flip
+            sd.inD = this.inR;
+            sd.inE = this.inL;
+
+            // vida
             if (GameObject.Find("lifeBar").GetComponent<Slider>() != null)
             {
-                //vida
                 life = sd.Atuallife;
                 maxLife = sd.MaxLife;
             }
@@ -100,7 +103,7 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
                 // os ifs estão separados, pois se estivesse no if abaixo, o else so aconteceria se ele estivesse no dash, oque causaria um erro na movimentação
                 if (Input.GetAxisRaw("Horizontal") != 0) // se o jogador estiver movendo o analogico
                 {
-                    player.GetComponent<Animator>().Play("idle"); // inicia a animação de movimentação
+                    player.GetComponent<Animator>().Play("walk"); // inicia a animação de movimentação
                                                                   // gira o personagem 
                     Flip();
                     if (Input.GetAxisRaw("Horizontal") > 0) inL = false;
@@ -175,15 +178,6 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
 
             // -=-=-=-=-=-=-=--=-=-=-=-=-=-=--=-=-=-
         }
-
-        if (Input.GetKeyDown(KeyCode.S))
-        {
-            Save(theSave);
-            Save(theSave);
-            Save(theSave);
-        }
-
-        Debug.Log(thatScene);
     }
 
     private bool InGround() // verifica se o player esta tocando no chão
@@ -193,11 +187,18 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
         
         if (hit.collider != null) // se colidiu na plataforma 
         {
+            theLastPosition = player.transform.position; // define posição antes de pular
+
             jumps = 0; // zera a quantidade de pulos dados
             canMakeDash = true; // só pode dá dash denovo se tocar no chão
             return true;
         }
         return false;
+    }
+
+    public void returnToGround()
+    {
+        player.GetComponent<Transform>().position = theLastPosition;
     }
 
     private void Flip() // gira o Player
@@ -211,14 +212,24 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
 
     public void ChangeLife(float newLife, float newMax) // mudar barra de vida
     {
-        GameObject.Find("lifeBar").GetComponent<Slider>().value += newLife; // vida atual
-        GameObject.Find("lifeBar").GetComponent<Slider>().maxValue += newMax; // vida maxima
+        life += newLife; // vida atual
+        maxLife += newMax; // vida maxima
+
+        if (GameObject.Find("lifeBar") != null) // carrega a barra de vida
+        {
+            GameObject.Find("lifeBar").GetComponent<Slider>().value = life;
+            GameObject.Find("lifeBar").GetComponent<Slider>().maxValue = maxLife;
+        }
     }
 
     public void ChangeScene(int newScene, int save) // muda cena atual
     {
         theSave = save;
         thatScene = newScene;
+
+        inL = false;
+        inR = false;
+
         SceneManager.LoadSceneAsync(newScene);
         Start();
     }
@@ -242,6 +253,10 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
             // posição do player
             sd.posx = player.transform.position.x;
             sd.posy = player.transform.position.y;
+
+            // flip
+            sd.inD = this.inR;
+            sd.inE = this.inL;
         }
 
         if(GameObject.Find("lifeBar").GetComponent<Slider>() != null)
@@ -297,6 +312,24 @@ using System.Xml.Serialization; // biblioteca ultilizada para serializar arquivo
     {
         get { return this.posy; }
         set { this.posy = value; }
+    }
+
+    // Flip
+    public bool inD;
+    public bool inE;
+
+    [XmlElement("InD",typeof(bool))]
+    public bool InD 
+    { 
+        get { return this.inD; } 
+        set { this.inD = value; } 
+    }
+
+    [XmlElement("InE", typeof(bool))]
+    public bool InE
+    {
+        get { return this.inE; }
+        set { this.inE = value; }
     }
 
     // Vida

@@ -10,11 +10,12 @@ GameObject:
   m_Component:
   - component: {fileID: 5625522502826777720}
   - component: {fileID: 5625522502826777723}
+  - component: {fileID: 7130479401925518909}
   - component: {fileID: 5625522502826777726}
   - component: {fileID: 5625522502826777721}
   m_Layer: 0
   m_Name: "cora\xE7\xE3o"
-  m_TagString: Untagged
+  m_TagString: coracao
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -85,6 +86,21 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!114 &7130479401925518909
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5625522502826777722}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2131e123ede59b4a86467b1009d7617, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  typeOfEvent: changeLife
+  lifeAdd: 50
+  maxLifeAdd: 0
 --- !u!58 &5625522502826777726
 CircleCollider2D:
   m_ObjectHideFlags: 0
